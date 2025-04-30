@@ -132,3 +132,5 @@ Once connected, you can type messages in the terminal, and they will be broadcas
 
 This documentation outlines all necessary details, including setup, usage examples, and deployment instructions for your WebSocket Server. Let me know if you need additional sections or further clarification!
 ```
+baxromov.shahzodbek@gmail.com
+```

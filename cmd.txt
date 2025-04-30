@@ -1,0 +1,21 @@
+[Unit]
+Description=WebSocket Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/socket_gateway
+Restart=on-failure
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
+
+==========================
+sudo systemctl daemon-reload
+sudo systemctl start socket_gateway
+sudo systemctl enable socket_gateway
+sudo systemctl status socket_gateway
+sudo journalctl -u socket_gateway

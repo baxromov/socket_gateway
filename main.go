@@ -17,26 +17,31 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Upgrader configuration for WebSocket
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		return true // Allow all origins
 	},
 }
 
+// WebSocket Client structure
 type Client struct {
 	conn *websocket.Conn
 	send chan []byte
 }
 
+// Central hub for managing WebSocket clients
 type Hub struct {
 	clients map[string]map[*Client]bool
 	lock    sync.RWMutex
 }
 
+// Create an instance of the Hub
 var hub = Hub{
 	clients: make(map[string]map[*Client]bool),
 }
 
+// Function to handle incoming WebSocket connections
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	channel := mux.Vars(r)["channel"]
 
@@ -71,6 +76,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	close(client.send)
 }
 
+// Function to read messages from a WebSocket connection
 func readMessage(client *Client, channel string) {
 	defer client.conn.Close()
 
@@ -93,6 +99,7 @@ func readMessage(client *Client, channel string) {
 	}
 }
 
+// Function to write messages to a WebSocket connection
 func writeMessage(client *Client) {
 	defer client.conn.Close()
 
@@ -105,6 +112,7 @@ func writeMessage(client *Client) {
 	}
 }
 
+// Function to retrieve the local IP address of the machine
 func getLocalIP() (string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -112,7 +120,7 @@ func getLocalIP() (string, error) {
 	}
 
 	for _, iface := range interfaces {
-		// Skip interfaces that are down or loopback
+		// Only consider interfaces that are up and not loopback
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
@@ -131,7 +139,7 @@ func getLocalIP() (string, error) {
 				ip = v.IP
 			}
 
-			// Return the first valid IPv4 address
+			// Return the first IPv4 address found
 			if ip != nil && ip.To4() != nil {
 				return ip.String(), nil
 			}
@@ -141,6 +149,7 @@ func getLocalIP() (string, error) {
 	return "", errors.New("no active network interfaces found")
 }
 
+// Get the file path of the hosts file based on the platform
 func getHostsFilePath() string {
 	if runtime.GOOS == "windows" {
 		return `C:\Windows\System32\drivers\etc\hosts`
@@ -148,71 +157,51 @@ func getHostsFilePath() string {
 	return "/etc/hosts"
 }
 
-func hostnameExistsInHosts(hostname string) (bool, error) {
-	hostsFile := getHostsFilePath()
+// Find the hostname in the /etc/hosts file for the provided IP
+func getHostnameForIP(ip string) (string, error) {
+	hostsFilePath := getHostsFilePath()
 
-	file, err := os.Open(hostsFile)
+	file, err := os.Open(hostsFilePath)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), hostname) {
-			return true, nil
+		line := scanner.Text()
+		// Skip commented or empty lines
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) >= 2 && parts[0] == ip {
+			return parts[1], nil // Return the hostname found for the IP
 		}
 	}
-
-	return false, nil
+	return "", errors.New("hostname not found for IP in hosts file")
 }
 
-func addHostnameToHosts(hostname, ip string) error {
-	hostsFile := getHostsFilePath()
-
-	file, err := os.OpenFile(hostsFile, os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	entry := fmt.Sprintf("%s %s\n", ip, hostname)
-	_, err = file.WriteString(entry)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
+// Main function
 func main() {
+	// Flags to specify port and optionally a hostname
 	port := flag.String("port", "8080", "Port to start the server on")
-	hostname := flag.String("hostname", "socketflow", "Hostname to map to the local IP")
+	defaultHostname := flag.String("hostname", "socketflow", "Default hostname to map to the local IP")
 	flag.Parse()
 
+	// Get the local IP address
 	localIP, err := getLocalIP()
 	if err != nil {
 		log.Fatalf("Failed to determine local IP: %v", err)
 	}
 
-	exists, err := hostnameExistsInHosts(*hostname)
+	hostname, err := getHostnameForIP(localIP)
 	if err != nil {
-		log.Printf("Error checking hosts file: %v", err)
-	}
-	if !exists {
-		fmt.Printf("Hostname '%s' not found in hosts file, attempting to add it...\n", *hostname)
-
-		err := addHostnameToHosts(*hostname, localIP)
-		if err != nil {
-			log.Printf("Failed to add hostname to hosts file: %v", err)
-			fmt.Printf("Could not add hostname '%s' to hosts file. You may need to run the program with elevated privileges (e.g., 'sudo').\n", *hostname)
-			fmt.Printf("Falling back to using the local IP address directly: %s\n", localIP)
-			*hostname = localIP
-		} else {
-			fmt.Printf("Added hostname '%s' mapped to '%s'.\n", *hostname, localIP)
-		}
+		log.Printf("Error finding hostname for local IP: %v", err)
+		log.Printf("Falling back to the default hostname: %s\n", *defaultHostname)
+		hostname = *defaultHostname
 	} else {
-		fmt.Printf("Hostname '%s' already exists in hosts file.\n", *hostname)
+		fmt.Printf("Found hostname '%s' for IP '%s'.\n", hostname, localIP)
 	}
 
 	addr := fmt.Sprintf("%s:%s", localIP, *port)
@@ -220,7 +209,7 @@ func main() {
 	r.HandleFunc("/{channel}", handleConnections)
 
 	fmt.Printf("WebSocket server running at:\n")
-	fmt.Printf("    Hostname: ws://%s:%s/{channel}\n", *hostname, *port)
+	fmt.Printf("    Hostname: ws://%s:%s/{channel}\n", hostname, *port)
 	fmt.Printf("    Local IP: ws://%s:%s/{channel}\n", localIP, *port)
 
 	if err := http.ListenAndServe(addr, r); err != nil {

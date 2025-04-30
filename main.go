@@ -185,7 +185,7 @@ func getHostnameForIP(ip string) (string, error) {
 // Main function
 func main() {
 	// Flags to specify port and optionally a hostname
-	port := flag.String("port", "8080", "Port to start the server on")
+	port := flag.String("port", "5000", "Port to start the server on")
 	defaultHostname := flag.String("hostname", "socketflow", "Default hostname to map to the local IP")
 	flag.Parse()
 

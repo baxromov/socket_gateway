@@ -1,4 +1,4 @@
-```markdown
+
 # WebSocket Server with Channel Support
 
 A high-performance WebSocket server implementation in Go that enables real-time communication through dynamic channels.  
@@ -23,48 +23,7 @@ Utilizing the powerful Gorilla WebSocket and Mux libraries, the server is design
 
 - **Go**: Ensure Go is installed (version 1.24 or later).  
   To install Go, visit [Go Downloads](https://go.dev/dl/).
-- **Required Libraries**: Install the necessary libraries listed below. Use the following commands to get the dependencies:
-  ```bash
-  go get github.com/gorilla/mux
-  go get github.com/gorilla/websocket
-  ```
 
----
-
-### Installation
-
-1. **Clone the Repository**:
-   Clone the repository where this WebSocket project resides using the following command:
-   ```bash
-   git clone <repository_url>
-   cd <repository_directory>
-   ```
-
-2. **Run the Server**:
-   Execute the Go file to start the WebSocket server:
-   ```bash
-   go run main.go
-   ```
-
----
-
-### Configuration Options
-
-You can customize the server using the available command-line flags:
-
-- **`-port`**: Specify the port on which the server should run (default: `8080`).
-- **`-hostname`**: Specify the custom hostname to map to the local IP (default: `socketflow`).
-
-For example:
-```
-bash
-go run main.go -port=3000 -hostname=mycustomhostname
-```
-The server would then listen at:
-```
-
-ws://mycustomhostname:3000/{channel}
-```
 ---
 
 ### How It Works
@@ -93,8 +52,8 @@ ws://mycustomhostname:3000/{channel}
   Replace `<hostname>`, `<port>`, and `{channel}` with your custom hostname, port, and channel name.
 
 - Sample WebSocket endpoints:
-    - `ws://localhost:8080/mychannel`
-    - `ws://socketflow:8080/chatroom`
+    - `ws://localhost:5000/mychannel`
+    - `ws://socketflow:5000/chatroom`
 
 ---
 
@@ -103,11 +62,10 @@ ws://mycustomhostname:3000/{channel}
 #### **Using JavaScript**
 
 Clients can use the WebSocket API in their browsers to connect to the server.
-```
-javascript
+```javascript
 // Establish a connection to the WebSocket server
 const channel = "mychannel"; // Replace with your channel name
-const ws = new WebSocket(`ws://localhost:8080/${channel}`);
+const ws = new WebSocket(`ws://localhost:5000/${channel}`);
 
 // Listen for incoming messages
 ws.onmessage = (event) => {
@@ -138,8 +96,8 @@ You can interact with the WebSocket server using `curl`:
 1. **Connect to the WebSocket Server**:
    ```bash
    curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" \
-   -H "Host: localhost:8080" -H "Origin: http://localhost:8080" \
-   ws://localhost:8080/mychannel
+   -H "Host: localhost:5000" -H "Origin: http://localhost:5000" \
+   ws://localhost:5000/mychannel
    ```
 
 2. **Send Messages**:  
@@ -157,84 +115,9 @@ npm install -g wscat
 Then, connect to your WebSocket server:
 ```
 bash
-wscat -c ws://localhost:8080/mychannel
+wscat -c ws://localhost:5000/mychannel
 ```
 Once connected, you can type messages in the terminal, and they will be broadcast to other clients in the same channel!
-
----
-
-## Testing Locally
-
-Here’s how you can test the WebSocket server:
-
-1. Start the WebSocket server:
-   ```bash
-   go run main.go -port=8080
-   ```
-
-2. Open multiple browser tabs or terminals to connect clients using the WebSocket URL:
-    - Browser JavaScript (DevTools Console):
-      ```javascript
-      const ws = new WebSocket("ws://localhost:8080/testchannel");
-      ws.onmessage = (e) => console.log(e.data);
-      ws.onopen = () => ws.send("Client connected!");
-      ```
-    - `wscat` or `curl` in a terminal.
-
-3. Messages sent by one client will be broadcast to all other clients connected to the same channel.
-
----
-
-## Deployment Notes
-
-- **Reverse Proxy**: For production, deploy the server behind a reverse proxy like Nginx or Apache to manage SSL/TLS encryption.  
-  Example Nginx config:
-  ```nginx
-  server {
-      listen 443 ssl;
-      server_name yourdomain.com;
-
-      ssl_certificate /path/to/fullchain.pem;
-      ssl_certificate_key /path/to/privkey.pem;
-
-      location / {
-          proxy_pass http://localhost:8080;
-          proxy_http_version 1.1;
-          proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection "upgrade";
-          proxy_set_header Host $host;
-          proxy_cache_bypass $http_upgrade;
-      }
-  }
-  ```
-
-- **Port Binding**: Ensure the WebSocket server binds to a port that is accessible (e.g., `80` or `443` behind a proxy).
-
-- **Environment Variables**: Consider using environment variables for port and hostname settings in production environments.
-
----
-
-## Troubleshooting
-
-1. **Port Already in Use**:  
-   If the port is already in use, specify a different port with the `-port` flag:
-   ```bash
-   go run main.go -port=3000
-   ```
-
-2. **WebSocket Connection Fails**:
-    - Ensure the server is running and accessible.
-    - Check firewall settings to ensure the port is open.
-    - If using a reverse proxy, verify its WebSocket configuration.
-
-3. **Dynamic Hostname Not Working**:
-    - Check your `/etc/hosts` file (or equivalent on Windows) to ensure the IP is properly mapped to a hostname.
-
----
-
-## License
-
-This project is open-source under the [MIT License](https://opensource.org/licenses/MIT). Feel free to use, modify, and distribute it for personal and commercial projects.
 
 ---
 

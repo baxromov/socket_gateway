@@ -43,7 +43,9 @@ var hub = Hub{
 
 // Function to handle incoming WebSocket connections
 func handleConnections(w http.ResponseWriter, r *http.Request) {
+	// Extract channel and subchannel from URL path parameters
 	channel := mux.Vars(r)["channel"]
+	subChannel := mux.Vars(r)["subchannel"] // Extract the additional subchannel path
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -52,25 +54,30 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	log.Printf("New connection on channel: %s, subchannel: %s", channel, subChannel)
+
 	client := &Client{
 		conn: conn,
 		send: make(chan []byte),
 	}
 
+	// Register client under the "channel/subChannel" namespace
 	hub.lock.Lock()
-	if hub.clients[channel] == nil {
-		hub.clients[channel] = make(map[*Client]bool)
+	fullChannel := fmt.Sprintf("%s/%s", channel, subChannel) // Create a unique namespace
+	if hub.clients[fullChannel] == nil {
+		hub.clients[fullChannel] = make(map[*Client]bool)
 	}
-	hub.clients[channel][client] = true
+	hub.clients[fullChannel][client] = true
 	hub.lock.Unlock()
 
 	go writeMessage(client)
-	readMessage(client, channel)
+	readMessage(client, fullChannel)
 
+	// When client disconnects, clean up
 	hub.lock.Lock()
-	delete(hub.clients[channel], client)
-	if len(hub.clients[channel]) == 0 {
-		delete(hub.clients, channel)
+	delete(hub.clients[fullChannel], client)
+	if len(hub.clients[fullChannel]) == 0 {
+		delete(hub.clients, fullChannel)
 	}
 	hub.lock.Unlock()
 	close(client.send)
@@ -206,11 +213,13 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", localIP, *port)
 	r := mux.NewRouter()
-	r.HandleFunc("/{channel}", handleConnections)
+
+	// Add new route that includes subchannel
+	r.HandleFunc("/{channel}/.../{subchannel}", handleConnections)
 
 	fmt.Printf("WebSocket server running at:\n")
-	fmt.Printf("    Hostname: ws://%s:%s/{channel}\n", hostname, *port)
-	fmt.Printf("    Local IP: ws://%s:%s/{channel}\n", localIP, *port)
+	fmt.Printf("    Hostname: ws://%s:%s/{channel}/.../{subchannel}\n", hostname, *port)
+	fmt.Printf("    Local IP: ws://%s:%s/{channel}/.../{subchannel}\n", localIP, *port)
 
 	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("Server failed: %v", err)
